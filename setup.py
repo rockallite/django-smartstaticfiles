@@ -20,7 +20,7 @@ setup(
     author='Rockallite Wulf',
     author_email='rockallite.wulf@gmail.com',
     install_requires=[
-        'Django>=1.11,Django<1.12',
+        'Django>=1.11,<1.12',
     ],
     extras_require={
         'rjsmin': ['rjsmin'],
