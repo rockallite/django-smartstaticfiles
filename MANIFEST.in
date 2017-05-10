@@ -1,0 +1,4 @@
+include LICENSE
+include LICENSE-DJANGO
+include README.rst
+recursive-include docs *
