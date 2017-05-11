@@ -156,7 +156,8 @@ class SmartManifestFilesMixin(CachedSettingsMixin, DynamicPatternsMixin,
                     content = storage.open(path)
                     opened = True
                 try:
-                    content_text = content.read().decode(settings.FILE_CHARSET)
+                    # content_text = content.read().decode(settings.FILE_CHARSET)
+                    content_text = content.read()
                 finally:
                     if opened:
                         content.close()

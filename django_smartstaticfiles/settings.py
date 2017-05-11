@@ -28,18 +28,18 @@ settings_defaults = {
     'CSS_FILE_PATTERNS': ['*.css'],
 
     # Dotted string of the module path and the callable for JavaScript
-    # minification. The callable should accept a single argument of unicode
+    # minification. The callable should accept a single argument of
     # string which contains the content of original JavaScript, and return
-    # a unicode string of minified content. (Notice that loud comments
+    # a string of minified content. (Notice that loud comments
     # such as /*! ... */ must be preserved in the result so as to make
     # JavaScript asset URLs replacement work.) The result will be cached and
     # reused when possible.
     'JS_MIN_FUNC': 'jsmin.jsmin',
 
     # Dotted string of the module path and the callable for CSS
-    # minification. The callable should accept a single argument of unicode
+    # minification. The callable should accept a single argument of
     # string which contains the content of original CSS, and return a
-    # unicode string of minified content. The result will be cached and
+    # string of minified content. The result will be cached and
     # reused when possible.
     'CSS_MIN_FUNC': 'csscompressor.compress',
 
