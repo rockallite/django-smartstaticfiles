@@ -10,7 +10,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-smartstaticfiles',
-    version='0.1.0',
+    version='0.2.0',
     packages=find_packages(),
     include_package_data=True,
     license='BSD License',
@@ -23,8 +23,8 @@ setup(
         'Django>=1.11,<1.12',
     ],
     extras_require={
-        'rjsmin': ['rjsmin'],
-        'rcssmin': ['rcssmin'],
+        'jsmin': ['jsmin'],
+        'cssmin': ['csscompressor'],
     },
     classifiers=[
         'Development Status :: 3 - Alpha',

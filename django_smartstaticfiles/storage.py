@@ -3,9 +3,11 @@ from __future__ import unicode_literals, absolute_import
 
 import os
 import logging
+import posixpath
 from tempfile import NamedTemporaryFile
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
@@ -13,7 +15,7 @@ from django.utils.encoding import force_bytes, force_text
 from django.utils.six import iteritems, itervalues, iterkeys
 from django.contrib.staticfiles.utils import matches_patterns
 from django.contrib.staticfiles.storage import (
-    ManifestFilesMixin, StaticFilesStorage,
+    HashedFilesMixin, ManifestFilesMixin, StaticFilesStorage,
 )
 
 from .settings import CachedSettingsMixin
@@ -21,7 +23,34 @@ from .settings import CachedSettingsMixin
 logger = logging.getLogger(__name__)
 
 
-class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
+class DuckTypedMatchObj(object):
+    def __init__(self, matched, url):
+        self.matched = matched
+        self.url = url
+
+    def groups(self):
+        return self.matched, self.url
+
+
+class DynamicPatternsMixin(object):
+    def __init__(self, *args, **kwargs):
+        self.update_patterns()
+        super(DynamicPatternsMixin, self).__init__(*args, **kwargs)
+
+    def update_patterns(self):
+        if not self.js_assets_repl_enabled:
+            return
+
+        self.patterns += (
+            ("*.js", (
+                (r"""(/\*!\s*%s(?:\((.*?)\))?\s*\*/\s*['"](.*?)['"]\s*/\*!\s*end%s\s*\*/)"""
+                    % (self.js_assets_repl_tag, self.js_assets_repl_tag),
+                 """'%s'"""),
+            )),
+        )
+
+class SmartManifestFilesMixin(CachedSettingsMixin, DynamicPatternsMixin,
+                              ManifestFilesMixin):
     def __init__(self, *args, **kwargs):
         super(SmartManifestFilesMixin, self).__init__(*args, **kwargs)
         if not settings.DEBUG:
@@ -35,6 +64,51 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
         self.intermediate_files = set()
         self.hashing_ignored_files = set()
         self.minified_files = {}
+
+    def url_converter(self, name, hashed_files, template=None):
+        # Overrides original verision from HashedFilesMixin of Django 1.11.
+        # Add support for "new-style" pattern which accepts a parent directory
+        # as the first match and a URL as the sencond match (mainly for loud
+        # comments in JavaScript).
+
+        def converter(matchobj):
+            groups = matchobj.groups()
+            if len(groups) == 2:
+                # For "classic" pattern, use the original converter maker.
+                # Then feed the converter with the original match object.
+                return super(SmartManifestFilesMixin, self).url_converter(
+                    name, hashed_files, template
+                )(matchobj)
+
+            # Add support for prefix path of "new-style" pattern
+            matched, virtual_parent_dir, url = groups
+
+            if virtual_parent_dir:
+                if virtual_parent_dir.startswith('.'):
+                    # The parent directory is relative to the current source name
+                    source_name = name if os.sep == '/' else name.replace(os.sep, '/')
+                    virtual_parent_dir = posixpath.normpath(
+                        posixpath.join(
+                            posixpath.dirname(source_name), virtual_parent_dir
+                        )
+                    )
+                else:
+                    # The parent directory is relative to root of static files
+                    if virtual_parent_dir.startswith('/'):
+                        virtual_parent_dir = virtual_parent_dir[1:]
+                virtual_name = posixpath.join(virtual_parent_dir,
+                                              'doesnotmatter')
+            else:
+                # Use the original name if parent directory is not given
+                virtual_name = name
+
+            # Create a duck-typed match object for the convertor, of which
+            # groups() method returns a tuple of two values.
+            return super(SmartManifestFilesMixin, self).url_converter(
+                virtual_name, hashed_files, template
+            )(DuckTypedMatchObj(matched, url))
+
+        return converter
 
     def get_pre_minified_name(self, path):
         fn, ext = os.path.splitext(path)

@@ -16,9 +16,11 @@ Features
 - Deletes unhashed files and intermediate files by default.
 - Optionally ignores hashing of specific files.
 - Optionally minifies JavaScript and CSS files.
+- Optionally replace JavaScript asset URLs with hashed versions using
+  *loud comments* markup. *(New in v0.2.0)*
 - Optimizes hashing process with fewer I/O and less calculation.
 
-Quick start
+Quick Start
 -----------
 
 1. Install the stable version from PyPI:
@@ -27,20 +29,20 @@ Quick start
 
        pip install django-smartstaticfiles
 
+   Or install the stable version with extras for JavaScript and CSS minification
+   (will also install |jsmin|_ and |csscompressor|_):
+
+   .. code:: bash
+
+       pip install django-smartstaticfiles[jsmin,cssmin]
+
    Or install the latest version from GitHub:
 
    .. code:: bash
 
        pip install git+https://github.com/rockallite/django-smartstaticfiles.git
 
-2. Optionally install |rjsmin|_ and |rcssmin|_ for JavaScript and CSS
-   minification (skip this step if you don't need this):
-
-   .. code:: bash
-
-       pip install rjsmin rcssmin
-
-3. In the Django project, add the following lines to the settings module:
+2. Add the following lines to the project's Django settings module:
 
    .. code:: python
 
@@ -54,11 +56,167 @@ Quick start
            'CSS_MIN_ENABLED': True,
        }
 
-4. In the project directory, run ``collectstatic`` management command:
+3. In the project directory, collect static files by running the following
+   command:
 
    .. code:: bash
 
        python manage.py collectstatic --clear --no-input
+
+JavaScript Asset URLs Replacement
+---------------------------------
+
+*(New in v0.2.0)*
+
+By default, URLs of referenced assets (images, fonts, etc) in CSS
+files will be replaced with hashed versions during processing. The
+``SmartManifestStaticFilesStorage`` storage backend of
+**django-smartstaticfiles** extends this feature to JavaScript files by
+using special *loud comments* (``/*! */``) markup.
+
+Simple use case
+~~~~~~~~~~~~~~~
+
+The feature is disabled by default. To enable it, add the following setting
+to Django settings module:
+
+.. code:: python
+
+    SMARTSTATICFILES_CONFIG = {
+        # Enable JavaScript asset URLs replacement
+        'JS_ASSETS_REPL_ENABLED': True,
+    }
+
+To replace an asset URL with the hashed version, surround the URL string with
+a pair of ``/*! rev */`` and ``/*! endrev */``:
+
+.. code:: javascript
+
+    var imageURL = /*! rev */ '../img/welcome.jpg' /*! endrev */;
+
+Supposed that the file hash is ``welcome.ac99c750806a.jpg``, the processing
+result will be:
+
+.. code:: javascript
+
+    var imageURL = '../img/welcome.ac99c750806a.jpg';
+
+Using a different parent directory
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, relative asset URLs are considered to be relative to the
+referencing JavaScript file, just the same rule for a CSS file. However,
+since JavaScript runs in global scope of a browser, the path of a
+JavaScript file is sometimes not useful for locating relative assets.
+
+Therefore, the markup accepts a parameter as *virtual parent path*.
+During processing, it will be considered as if it were the parent path
+of the asset. For example:
+
+.. code:: javascript
+
+    /*
+     * Supposed there are following files:
+     *     STATIC_URL/helloworld/img/welcome.jpg
+     *     STATIC_URL/helloworld/js/main.js
+     *
+     * Then in the main.js:
+     */
+
+    var imageURLs = [
+        // *** Absolute reference ***
+        // (STATIC_URL as the root path)
+
+        // Leading and trailing slashes are optional
+        /*! rev(helloworld/img) */ 'welcome.jpg' /*! endrev */,
+        /*! rev(/helloworld/img/) */ 'welcome.jpg' /*! endrev */,
+
+        // A single leading slash is OK
+        /*! rev(/helloworld/img) */ 'welcome.jpg' /*! endrev */,
+
+        // A single trailing slash is OK
+        /*! rev(helloworld/img/) */ 'welcome.jpg' /*! endrev */,
+
+        // Different path portion
+        /*! rev(helloworld) */ 'img/welcome.jpg' /*! endrev */,
+
+        // A single slash for the root path
+        /*! rev(/) */ 'helloworld/img/welcome.jpg' /*! endrev */,
+
+        // *** Relative reference ***
+        // (Relative to the JavaScript file)
+
+        // A leading dot slash (./) or dot-dot slash (../) indicates a relative reference
+        /*! rev(../img) */ 'welcome.jpg' /*! endrev */,
+        /*! rev(..) */ 'img/welcome.jpg' /*! endrev */,
+        /*! rev(../..) */ 'helloworld/img/welcome.jpg' /*! endrev */
+    ];
+
+The processing result:
+
+.. code:: javascript
+
+    /*
+     * Supposed there are following files:
+     *     STATIC_URL/helloworld/img/welcome.jpg
+     *     STATIC_URL/helloworld/js/main.js
+     *
+     * Then in the main.js:
+     */
+
+    var imageURLs = [
+        // *** Absolute reference ***
+        // (STATIC_URL as the root path)
+
+        // Leading and trailing slashes are optional
+        'welcome.ac99c750806a.jpg',
+        'welcome.ac99c750806a.jpg',
+
+        // A single leading slash is OK
+        'welcome.ac99c750806a.jpg',
+
+        // A single trailing slash is OK
+        'welcome.ac99c750806a.jpg',
+
+        // Different path portion
+        'img/welcome.ac99c750806a.jpg',
+
+        // A single slash for the root path
+        'helloworld/img/welcome.ac99c750806a.jpg',
+
+        // *** Relative reference ***
+        // (Relative to the JavaScript file)
+
+        // A leading dot slash (./) or dot-dot slash (../) indicates a relative reference
+        'welcome.ac99c750806a.jpg',
+        'img/welcome.ac99c750806a.jpg',
+        'helloworld/img/welcome.ac99c750806a.jpg'
+    ];
+
+Notice that ``STATIC_URL`` **WILL NOT be prepended to the final URL**. You
+have to manually pass the value of ``STATIC_URL`` to the browser, e.g. in a
+Django template via dynamic generated JavaScript code. Then, concatenate the two values in JavaScript.
+
+Customize the tag name
+~~~~~~~~~~~~~~~~~~~~~~
+
+You can also use a custom tag name in loud comments markup via the following
+setting in Django settings module:
+
+.. code:: python
+
+    SMARTSTATICFILES_CONFIG = {
+        # ...
+        # Tag name of loud comments used in JavaScript asset URLs replacement
+        'JS_ASSETS_REPL_TAG': 'hash-it',
+    }
+
+Then the corresponding JavaScript code should be written as:
+
+.. code:: javascript
+
+    var imageURL = /*! hash-it */ '../img/welcome.jpg' /*! endhash-it */;
+
 
 Configurations
 --------------
@@ -70,8 +228,6 @@ property at all if the default values meet your needs.
 Possible keys and default values are listed below:
 
 .. code:: python
-
-    # your_project/settings.py
 
     SMARTSTATICFILES_CONFIG = {
         # Whether to enable JavaScript minification.
@@ -91,16 +247,18 @@ Possible keys and default values are listed below:
         # Dotted string of the module path and the callable for JavaScript
         # minification. The callable should accept a single argument of unicode
         # string which contains the content of original JavaScript, and return
-        # a unicode string of minified content. The result will be cached and
+        # a unicode string of minified content. (Notice that loud comments
+        # such as /*! ... */ must be preserved in the result so as to make
+        # JavaScript asset URLs replacement work.) The result will be cached and
         # reused when possible.
-        'JS_MIN_FUNC': 'rjsmin.jsmin',
+        'JS_MIN_FUNC': 'jsmin.jsmin',
 
         # Dotted string of the module path and the callable for CSS
         # minification. The callable should accept a single argument of unicode
         # string which contains the content of original CSS, and return a
         # unicode string of minified content. The result will be cached and
         # reused when possible.
-        'CSS_MIN_FUNC': 'rcssmin.cssmin',
+        'CSS_MIN_FUNC': 'csscompressor.compress',
 
         # A regular expression (case-sensitive by default) which is used to
         # search against assets (in relative URL without STATIC_URL prefix). The
@@ -118,6 +276,14 @@ Possible keys and default values are listed below:
         # search against assets (in relative URL without STATIC_URL prefix). The
         # matched assets won't be hashed. Set it to None to ignore no assets.
         'RE_IGNORE_HASHING': None,
+
+        # Whether to enable JavaScript asset URLs replacement.
+        'JS_ASSETS_REPL_ENABLED': False,
+
+        # Tag name of loud comments used in JavaScript asset URLs replacement.
+        # Only alphabetic characters, numeric characters, underscores (_) and
+        # dashes (-) can be used in the tag name.
+        'JS_ASSETS_REPL_TAG': 'rev',
     }
 
 
@@ -195,11 +361,11 @@ of **django-smartstaticfiles** with older Django code. Therefore, only Django
 .. |ManifestStaticFilesStorage| replace:: ``ManifestStaticFilesStorage``
 .. _ManifestStaticFilesStorage: https://docs.djangoproject.com/en/1.11/ref/contrib/staticfiles/#manifeststaticfilesstorage
 
-.. |rjsmin| replace:: ``rjsmin``
-.. _rjsmin: http://opensource.perlig.de/rjsmin/
+.. |jsmin| replace:: ``jsmin``
+.. _jsmin: https://github.com/tikitu/jsmin/
 
-.. |rcssmin| replace:: ``rcssmin``
-.. _rcssmin: http://opensource.perlig.de/rcssmin/
+.. |csscompressor| replace:: ``csscompressor``
+.. _csscompressor: https://github.com/sprymix/csscompressor
 
 .. _django-s3-storage: https://github.com/etianen/django-s3-storage
 

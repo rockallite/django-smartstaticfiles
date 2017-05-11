@@ -30,16 +30,18 @@ settings_defaults = {
     # Dotted string of the module path and the callable for JavaScript
     # minification. The callable should accept a single argument of unicode
     # string which contains the content of original JavaScript, and return
-    # a unicode string of minified content. The result will be cached and
+    # a unicode string of minified content. (Notice that loud comments
+    # such as /*! ... */ must be preserved in the result so as to make
+    # JavaScript asset URLs replacement work.) The result will be cached and
     # reused when possible.
-    'JS_MIN_FUNC': 'rjsmin.jsmin',
+    'JS_MIN_FUNC': 'jsmin.jsmin',
 
     # Dotted string of the module path and the callable for CSS
     # minification. The callable should accept a single argument of unicode
     # string which contains the content of original CSS, and return a
     # unicode string of minified content. The result will be cached and
     # reused when possible.
-    'CSS_MIN_FUNC': 'rcssmin.cssmin',
+    'CSS_MIN_FUNC': 'csscompressor.compress',
 
     # A regular expression (case-sensitive by default) which is used to
     # search against assets (in relative URL without STATIC_URL prefix). The
@@ -57,11 +59,24 @@ settings_defaults = {
     # search against assets (in relative URL without STATIC_URL prefix). The
     # matched assets won't be hashed. Set it to None to ignore no assets.
     'RE_IGNORE_HASHING': None,
+
+    # Whether to enable JavaScript asset URLs replacement.
+    'JS_ASSETS_REPL_ENABLED': False,
+
+    # Tag name of loud comments used in JavaScript asset URLs replacement.
+    # Only alphabetic characters, numeric characters, underscores (_) and
+    # dashes (-) can be used in the tag name.
+    'JS_ASSETS_REPL_TAG': 'rev',
 }
 
 settings_cache = None
 settings_imports = ['JS_MIN_FUNC', 'CSS_MIN_FUNC']
 settings_re_keys = ['RE_IGNORE_MIN', 'RE_IGNORE_HASHING']
+settings_repl_tag_validators = [
+    (r'^[a-zA-Z0-9_\-]+$',
+     'only alphabetic characters, numeric characters, underscores (_) and '
+     'dashes (-) can be used in the tag name'),
+]
 
 
 def setup_settings_cache():
@@ -82,6 +97,11 @@ def setup_settings_cache():
         # Set default values
         for key, value in iteritems(settings_defaults):
             settings_cache.setdefault(key, value)
+        # Validate JavaScript asset URLs replacement tag
+        repl_tag = settings_cache['JS_ASSETS_REPL_TAG']
+        for regex, msg in settings_repl_tag_validators:
+            if not re.search(regex, repl_tag):
+                raise ImproperlyConfigured('%s, got: %s' % (msg, repl_tag))
         # Import modules from dotted strings
         for key in settings_imports:
             settings_cache[key] = import_string(settings_cache[key])
@@ -167,3 +187,11 @@ class CachedSettingsMixin(object):
     @cached_property
     def re_ignore_hashing(self):
         return self._cached_setting_key('RE_IGNORE_HASHING')
+
+    @cached_property
+    def js_assets_repl_enabled(self):
+        return self._cached_setting_key('JS_ASSETS_REPL_ENABLED')
+
+    @cached_property
+    def js_assets_repl_tag(self):
+        return self._cached_setting_key('JS_ASSETS_REPL_TAG')
