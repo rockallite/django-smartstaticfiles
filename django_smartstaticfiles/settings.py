@@ -6,9 +6,8 @@ import re
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
-from django.utils.functional import cached_property
 from django.utils.module_loading import import_string
-from django.utils.six import iteritems
+from django.utils.six import iteritems, iterkeys
 
 settings_attr = 'SMARTSTATICFILES_CONFIG'
 
@@ -64,24 +63,21 @@ settings_defaults = {
     'JS_ASSETS_REPL_ENABLED': False,
 
     # Tag name of loud comments used in JavaScript asset URLs replacement.
-    # Only alphabetic characters, numeric characters, underscores (_) and
-    # dashes (-) can be used in the tag name.
     'JS_ASSETS_REPL_TAG': 'rev',
+
+    # Whether to remove one trailing newline (if presents) after each
+    # replaced URL in JavaScript. This is effective only if "JS_MIN_ENABLED"
+    # is set to True. This fixes the problems and annoyances caused by a
+    # deliberately added newline at the end of each loud comment by certain
+    # minification libraries (such as jsmin).
+    'JS_ASSETS_REPL_TRAILING_FIX': True,
 }
 
 settings_cache = None
-settings_imports = ['JS_MIN_FUNC', 'CSS_MIN_FUNC']
-settings_re_keys = ['RE_IGNORE_MIN', 'RE_IGNORE_HASHING']
-settings_repl_tag_validators = [
-    (r'^[a-zA-Z0-9_\-]+$',
-     'only alphabetic characters, numeric characters, underscores (_) and '
-     'dashes (-) can be used in the tag name'),
-]
 
 
 def setup_settings_cache():
     global settings_cache
-
     if settings_cache is None:
         try:
             _settings = getattr(settings, settings_attr)
@@ -97,16 +93,18 @@ def setup_settings_cache():
         # Set default values
         for key, value in iteritems(settings_defaults):
             settings_cache.setdefault(key, value)
-        # Validate JavaScript asset URLs replacement tag
-        repl_tag = settings_cache['JS_ASSETS_REPL_TAG']
-        for regex, msg in settings_repl_tag_validators:
-            if not re.search(regex, repl_tag):
-                raise ImproperlyConfigured('%s, got: %s' % (msg, repl_tag))
         # Import modules from dotted strings
-        for key in settings_imports:
-            settings_cache[key] = import_string(settings_cache[key])
+        if settings_cache['JS_MIN_ENABLED']:
+            settings_cache['JS_MIN_FUNC'] = \
+                import_string(settings_cache['JS_MIN_FUNC'])
+        if settings_cache['CSS_MIN_ENABLED']:
+            settings_cache['CSS_MIN_FUNC'] = \
+                import_string(settings_cache['CSS_MIN_FUNC'])
         # Compile possible regular expressions
-        for key in settings_re_keys:
+        regex_keys_to_cache = ['RE_IGNORE_HASHING']
+        if settings_cache['JS_MIN_ENABLED'] or settings_cache['CSS_MIN_ENABLED']:
+            regex_keys_to_cache.append('RE_IGNORE_MIN')
+        for key in regex_keys_to_cache:
             regex = settings_cache.get(key, None)
             if regex:
                 try:
@@ -122,76 +120,50 @@ def setup_settings_cache():
 
 def clear_settings_cache():
     global settings_cache
-
     settings_cache = None
+
+
+def get_cached_setting_key(key):
+    setup_settings_cache()
+    return settings_cache[key]
+
+
+def settings_changed_handler(setting, **kwargs):
+    if setting == settings_attr:
+        clear_settings_cache()
+
+
+setting_changed.connect(settings_changed_handler)
 
 
 class CachedSettingsMixin(object):
     def __init__(self, *args, **kwargs):
+        self.update_patterns()
         super(CachedSettingsMixin, self).__init__(*args, **kwargs)
-        setting_changed.connect(self._clear_cached_props)
 
-    def _clear_cached_props(self, setting, **kwargs):
-        if setting == settings_attr:
-            self.__dict__.pop('js_min_enabled', None)
-            self.__dict__.pop('css_min_enabled', None)
-            self.__dict__.pop('js_file_patterns', None)
-            self.__dict__.pop('css_file_patterns', None)
-            self.__dict__.pop('js_min_func', None)
-            self.__dict__.pop('css_min_func', None)
-            self.__dict__.pop('re_ignore_min', None)
-            self.__dict__.pop('delete_unhashed_enabled', None)
-            self.__dict__.pop('delete_intermediate_enabled', None)
-            self.__dict__.pop('re_ignore_hashing', None)
+    def update_patterns(self):
+        if not self.js_assets_repl_enabled:
+            return
 
-    def _cached_setting_key(self, key):
-        setup_settings_cache()
-        return settings_cache[key]
+        esc_tag = re.escape(self.js_assets_repl_tag)
+        self.patterns += (
+            ("*.js", (
+                (r"""(/\*!\s*%s(?:\((.*?)\))?\s*\*/\s*['"](.*?)['"]\s*/\*!\s*end%s\s*\*/(\n)?)"""
+                    % (esc_tag, esc_tag),
+                 """'%s'"""),
+            )),
+        )
 
-    @cached_property
-    def js_min_enabled(self):
-        return self._cached_setting_key('JS_MIN_ENABLED')
 
-    @cached_property
-    def css_min_enabled(self):
-        return self._cached_setting_key('CSS_MIN_ENABLED')
+class SettingProxy(object):
+    def __init__(self, key):
+        self.key = key
 
-    @cached_property
-    def js_file_patterns(self):
-        return self._cached_setting_key('JS_FILE_PATTERNS')
+    def __call__(self, instance):
+        return get_cached_setting_key(self.key)
 
-    @cached_property
-    def css_file_patterns(self):
-        return self._cached_setting_key('CSS_FILE_PATTERNS')
 
-    @cached_property
-    def js_min_func(self):
-        return self._cached_setting_key('JS_MIN_FUNC')
-
-    @cached_property
-    def css_min_func(self):
-        return self._cached_setting_key('CSS_MIN_FUNC')
-
-    @cached_property
-    def re_ignore_min(self):
-        return self._cached_setting_key('RE_IGNORE_MIN')
-
-    @cached_property
-    def delete_unhashed_enabled(self):
-        return self._cached_setting_key('DELETE_UNHASHED_ENABLED')
-
-    @cached_property
-    def delete_intermediate_enabled(self):
-        return self._cached_setting_key('DELETE_INTERMEDIATE_ENABLED')
-
-    @cached_property
-    def re_ignore_hashing(self):
-        return self._cached_setting_key('RE_IGNORE_HASHING')
-
-    @cached_property
-    def js_assets_repl_enabled(self):
-        return self._cached_setting_key('JS_ASSETS_REPL_ENABLED')
-
-    @cached_property
-    def js_assets_repl_tag(self):
-        return self._cached_setting_key('JS_ASSETS_REPL_TAG')
+# Dynamically create properties, whose names are lower-cased keys of
+# settings_defaults
+for key in iterkeys(settings_defaults):
+    setattr(CachedSettingsMixin, key.lower(), property(SettingProxy(key)))
