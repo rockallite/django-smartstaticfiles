@@ -1,4 +1,3 @@
-=======================
 django-smartstaticfiles
 =======================
 
@@ -69,16 +68,15 @@ JavaScript Asset URLs Replacement
 *(New in v0.2.0)*
 
 By default, URLs of referenced assets (images, fonts, etc) in CSS
-files will be replaced with hashed versions during processing. The
-``SmartManifestStaticFilesStorage`` storage backend of
+files will be replaced with hashed versions during processing.
 **django-smartstaticfiles** extends this feature to JavaScript files by
-using special *loud comments* (``/*! */``) markup.
+utilizing special *loud comments* (``/*! ... */``) markup.
 
 Simple use case
 ~~~~~~~~~~~~~~~
 
-The feature is disabled by default. To enable it, add the following setting
-to Django settings module:
+The JavaScript asset URLs replacement feature is disabled by default. To enable
+it, add the following setting to Django settings module:
 
 .. code:: python
 
@@ -88,30 +86,35 @@ to Django settings module:
     }
 
 To replace an asset URL with the hashed version, surround the URL string with
-a pair of ``/*! rev */`` and ``/*! endrev */``:
+``/*! rev */`` and ``/*! endrev */`` markup:
 
 .. code:: javascript
 
     var imageURL = /*! rev */ '../img/welcome.jpg' /*! endrev */;
 
-Supposed that the file hash is ``welcome.ac99c750806a.jpg``, the processing
-result will be:
+Supposed that the hashed filename is ``welcome.ac99c750806a.jpg``, the
+processing result will be:
 
 .. code:: javascript
 
     var imageURL = '../img/welcome.ac99c750806a.jpg';
 
-Using a different parent directory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only a single- or double-quoted bare string should be put inside ``/*! rev */``
+and ``/*! endrev */`` markup. No comma or semicolon is allowed. Spaces around
+or inside loud comments are optional, though.
+
+Using a different parent path
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, relative asset URLs are considered to be relative to the
 referencing JavaScript file, just the same rule for a CSS file. However,
 since JavaScript runs in global scope of a browser, the path of a
 JavaScript file is sometimes not useful for locating relative assets.
 
-Therefore, the markup accepts a parameter as *virtual parent path*.
-During processing, it will be considered as if it were the parent path
-of the asset. For example:
+Therefore, the markup accepts a parameter as *virtual parent path*, passing in
+between a pair of parentheses right behind the loud comment starting tag, like
+this: ``/*! rev(path) */``. During processing, it will be considered as if it
+were the parent path of the asset. For example:
 
 .. code:: javascript
 
@@ -127,32 +130,30 @@ of the asset. For example:
         // *** Absolute reference ***
         // (STATIC_URL as the root path)
 
-        // Leading and trailing slashes are optional
+        // Leading and trailing slashes in a virtual parent path are optional
         /*! rev(helloworld/img) */ 'welcome.jpg' /*! endrev */,
         /*! rev(/helloworld/img/) */ 'welcome.jpg' /*! endrev */,
-
-        // A single leading slash is OK
         /*! rev(/helloworld/img) */ 'welcome.jpg' /*! endrev */,
-
-        // A single trailing slash is OK
         /*! rev(helloworld/img/) */ 'welcome.jpg' /*! endrev */,
 
-        // Different path portion
-        /*! rev(helloworld) */ 'img/welcome.jpg' /*! endrev */,
+        // A leading dot slash (./) or dot-dot slash (../) in an asset URL is OK
+        /*! rev(helloworld/img) */ './welcome.jpg' /*! endrev */,
+        /*! rev(helloworld/img) */ '../img/welcome.jpg' /*! endrev */,
 
-        // A single slash for the root path
+        // Use different path portion in a virtual parent path. A single slash means root (STATIC_URL).
+        /*! rev(helloworld) */ 'img/welcome.jpg' /*! endrev */,
         /*! rev(/) */ 'helloworld/img/welcome.jpg' /*! endrev */,
 
         // *** Relative reference ***
         // (Relative to the JavaScript file)
 
-        // A leading dot slash (./) or dot-dot slash (../) indicates a relative reference
+        // A leading dot (.) or dot-dot (..) path part in a virtual parent path indicates a relative reference
         /*! rev(../img) */ 'welcome.jpg' /*! endrev */,
         /*! rev(..) */ 'img/welcome.jpg' /*! endrev */,
         /*! rev(../..) */ 'helloworld/img/welcome.jpg' /*! endrev */
     ];
 
-The processing result:
+After processing, the above code becomes:
 
 .. code:: javascript
 
@@ -168,37 +169,35 @@ The processing result:
         // *** Absolute reference ***
         // (STATIC_URL as the root path)
 
-        // Leading and trailing slashes are optional
+        // Leading and trailing slashes in a virtual parent path are optional
+        'welcome.ac99c750806a.jpg',
+        'welcome.ac99c750806a.jpg',
         'welcome.ac99c750806a.jpg',
         'welcome.ac99c750806a.jpg',
 
-        // A single leading slash is OK
-        'welcome.ac99c750806a.jpg',
+        // A leading dot slash (./) or dot-dot slash (../) in an asset URL is OK
+        './welcome.ac99c750806a.jpg',
+        '../img/welcome.ac99c750806a.jpg',
 
-        // A single trailing slash is OK
-        'welcome.ac99c750806a.jpg',
-
-        // Different path portion
+        // Use different path portion in a virtual parent path. A single slash means root (STATIC_URL).
         'img/welcome.ac99c750806a.jpg',
-
-        // A single slash for the root path
         'helloworld/img/welcome.ac99c750806a.jpg',
 
         // *** Relative reference ***
         // (Relative to the JavaScript file)
 
-        // A leading dot slash (./) or dot-dot slash (../) indicates a relative reference
+        // A leading dot (.) or dot-dot (..) path part in a virtual parent path indicates a relative reference
         'welcome.ac99c750806a.jpg',
         'img/welcome.ac99c750806a.jpg',
         'helloworld/img/welcome.ac99c750806a.jpg'
     ];
 
 Notice that ``STATIC_URL`` **WILL NOT be prepended to the final URL**. You
-have to manually pass the value of ``STATIC_URL`` to the browser, e.g. in a
-Django template via dynamic generated JavaScript code. Then, concatenate the two values in JavaScript.
+have to pass the value of ``STATIC_URL`` to the browser, e.g. via Django
+templates in dynamic generated JavaScript code, and then manually concatenate the value and the URL path in JavaScript.
 
-Customize the tag name
-~~~~~~~~~~~~~~~~~~~~~~
+Customizing the tag name
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can also use a custom tag name in loud comments markup via the following
 setting in Django settings module:
@@ -217,6 +216,54 @@ Then the corresponding JavaScript code should be written as:
 
     var imageURL = /*! hash-it */ '../img/welcome.jpg' /*! endhash-it */;
 
+Hints about minification
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you use a customized JavaScript minification function, you should ensure
+that loud comments (``/*! ... */``) are preserved after processing.
+Otherwise, JavaScript asset URLs replacement won't work. The default ``jsmin``
+library takes care of that.
+
+Some JavaScript minification libraries (including ``jsmin``) will deliberately
+insert a newline at the end of each loud comment after minification. For
+example, supposed that there is following code:
+
+.. code:: javascript
+
+    var imageURL = /*! rev */ '../img/welcome.jpg' /*! endrev */;
+    var mehFace = 'mehFace';
+
+It would be minified as:
+
+.. code:: javascript
+
+    var imageURL=/*! rev */
+    '../img/welcome.jpg'/*! endrev */
+    ;var mehFace='mehFace';
+
+This is totally acceptable in most cases. However, it is still possible that
+it causes unexpected results in `some edge cases`_ or drives perfectionists
+nuts. Therefore **django-smartstaticfiles** by default will remove one trailing
+newline (if presents) from each replaced URL in JavaScript if ``"JS_MIN_ENABLED"`` is set to ``True``. The final result after URLs replacement would be:
+
+.. code:: javascript
+
+    var imageURL='../img/welcome.ac99c750806a.jpg';var mehFace='mehFace';
+
+That's much nicer. If you don't want this behavior, add the following setting
+to Django settings module:
+
+.. code:: python
+
+    SMARTSTATICFILES_CONFIG = {
+        # ...
+        # Disable removal of a trailing newline at the end of loud comments when replacing asset URLs
+        # in JavaScript (restoring the old behavior in v0.2.0)
+        'JS_ASSETS_REPL_TRAILING_FIX': False,
+    }
+
+*(New in v0.3.0: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting and new behavior
+is added.)*
 
 Configurations
 --------------
@@ -281,9 +328,14 @@ Possible keys and default values are listed below:
         'JS_ASSETS_REPL_ENABLED': False,
 
         # Tag name of loud comments used in JavaScript asset URLs replacement.
-        # Only alphabetic characters, numeric characters, underscores (_) and
-        # dashes (-) can be used in the tag name.
         'JS_ASSETS_REPL_TAG': 'rev',
+
+        # Whether to remove one trailing newline (if presents) after each
+        # replaced URL in JavaScript. This is effective only if "JS_MIN_ENABLED"
+        # is set to True. This fixes the problems and annoyances caused by a
+        # deliberately added newline at the end of each loud comment by certain
+        # minification libraries (such as jsmin).
+        'JS_ASSETS_REPL_TRAILING_FIX': True,
     }
 
 
@@ -346,10 +398,11 @@ referenced files (images, fonts, etc) aren't represented in hashes of
 referencing files (CSS files, specifically). This breaks the foundation of
 cache-busting mechanism.
 
-Then, there are significant code changes in Django 1.11 in order to fix the
-behavior of that storage backend. So it becomes impractical to maintain compatibility
-of **django-smartstaticfiles** with older Django code. Therefore, only Django
-1.11 is supported (the latest version at the time of writing).
+Then, there are significant code changes in Django 1.11.x in order to fix the
+behavior of the ``ManifestStaticFilesStorage`` storage backend. And it becomes
+impractical to maintain compatibility of **django-smartstaticfiles** with older
+Django code. Therefore, only Django 1.11.x is supported (the latest version at
+the time of writing).
 
 
 .. |collectstatic| replace:: ``collectstatic``
@@ -366,6 +419,8 @@ of **django-smartstaticfiles** with older Django code. Therefore, only Django
 
 .. |csscompressor| replace:: ``csscompressor``
 .. _csscompressor: https://github.com/sprymix/csscompressor
+
+.. _`some edge cases`: http://stackoverflow.com/questions/2846283/what-are-the-rules-for-javascripts-automatic-semicolon-insertion-asi
 
 .. _django-s3-storage: https://github.com/etianen/django-s3-storage
 

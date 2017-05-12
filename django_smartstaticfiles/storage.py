@@ -4,6 +4,7 @@ from __future__ import unicode_literals, absolute_import
 import os
 import logging
 import posixpath
+import re
 from tempfile import NamedTemporaryFile
 
 from django.conf import settings
@@ -32,25 +33,7 @@ class DuckTypedMatchObj(object):
         return self.matched, self.url
 
 
-class DynamicPatternsMixin(object):
-    def __init__(self, *args, **kwargs):
-        self.update_patterns()
-        super(DynamicPatternsMixin, self).__init__(*args, **kwargs)
-
-    def update_patterns(self):
-        if not self.js_assets_repl_enabled:
-            return
-
-        self.patterns += (
-            ("*.js", (
-                (r"""(/\*!\s*%s(?:\((.*?)\))?\s*\*/\s*['"](.*?)['"]\s*/\*!\s*end%s\s*\*/)"""
-                    % (self.js_assets_repl_tag, self.js_assets_repl_tag),
-                 """'%s'"""),
-            )),
-        )
-
-class SmartManifestFilesMixin(CachedSettingsMixin, DynamicPatternsMixin,
-                              ManifestFilesMixin):
+class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
     def __init__(self, *args, **kwargs):
         super(SmartManifestFilesMixin, self).__init__(*args, **kwargs)
         if not settings.DEBUG:
@@ -70,6 +53,8 @@ class SmartManifestFilesMixin(CachedSettingsMixin, DynamicPatternsMixin,
         # Add support for "new-style" pattern which accepts a parent directory
         # as the first match and a URL as the sencond match (mainly for loud
         # comments in JavaScript).
+        if template is None:
+            template = self.default_template
 
         def converter(matchobj):
             groups = matchobj.groups()
@@ -81,31 +66,44 @@ class SmartManifestFilesMixin(CachedSettingsMixin, DynamicPatternsMixin,
                 )(matchobj)
 
             # Add support for prefix path of "new-style" pattern
-            matched, virtual_parent_dir, url = groups
+            matched = groups[0]
+            vp_dir = groups[1]
+            url = groups[2]
+            if len(groups) > 3:
+                # Remember trailing characters
+                trailing_chars = groups[3] or ''
+            else:
+                trailing_chars = ''
 
-            if virtual_parent_dir:
-                if virtual_parent_dir.startswith('.'):
-                    # The parent directory is relative to the current source name
+            if vp_dir:
+                if vp_dir in ('.', '..') \
+                        or vp_dir.startswith('./') \
+                        or vp_dir.startswith('../'):
+                    # The parent directory is relative to the source name
                     source_name = name if os.sep == '/' else name.replace(os.sep, '/')
-                    virtual_parent_dir = posixpath.normpath(
-                        posixpath.join(
-                            posixpath.dirname(source_name), virtual_parent_dir
-                        )
+                    vp_dir = posixpath.normpath(
+                        posixpath.join(posixpath.dirname(source_name), vp_dir)
                     )
                 else:
                     # The parent directory is relative to root of static files
-                    if virtual_parent_dir.startswith('/'):
-                        virtual_parent_dir = virtual_parent_dir[1:]
-                virtual_name = posixpath.join(virtual_parent_dir,
-                                              'doesnotmatter')
+                    if vp_dir.startswith('/'):
+                        vp_dir = vp_dir[1:]
+                vname = posixpath.join(vp_dir, 'doesnotmatter')
             else:
                 # Use the original name if parent directory is not given
-                virtual_name = name
+                vname = name
+
+            if not trailing_chars or \
+                    self.js_min_enabled and self.js_assets_repl_trailing_fix:
+                new_template = template
+            else:
+                new_template = '%s%s' % (template,
+                                         trailing_chars.replace('%', '%%'))
 
             # Create a duck-typed match object for the convertor, of which
             # groups() method returns a tuple of two values.
             return super(SmartManifestFilesMixin, self).url_converter(
-                virtual_name, hashed_files, template
+                vname, hashed_files, new_template
             )(DuckTypedMatchObj(matched, url))
 
         return converter
