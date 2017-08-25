@@ -27,20 +27,35 @@ settings_defaults = {
     'CSS_FILE_PATTERNS': ['*.css'],
 
     # Dotted string of the module path and the callable for JavaScript
-    # minification. The callable should accept a single argument of
-    # string which contains the content of original JavaScript, and return
-    # a string of minified content. (Notice that loud comments
-    # such as /*! ... */ must be preserved in the result so as to make
-    # JavaScript asset URLs replacement work.) The result will be cached and
-    # reused when possible.
-    'JS_MIN_FUNC': 'jsmin.jsmin',
+    # minification. The callable should accept a single argument of a string
+    # of the content of original JavaScript, and return a string of minified
+    # content. (Notice that loud comments such as /*! ... */ must be preserved
+    # in the result so as to make JavaScript asset URLs replacement work.)
+    # The result will be cached and reused when possible.
+    'JS_MIN_FUNC': 'rjsmin.jsmin',
+
+    # Extra keyword arguments which are sent to the callable for JavaScript
+    # minification. They are sent after the argument of a string of the
+    # content of original JavaScript. If no keyword arguments are sent, set it
+    # to an empty dict ({}) or None.
+    'JS_MIN_FUNC_KWARGS': {
+        'keep_bang_comments': True,
+    },
 
     # Dotted string of the module path and the callable for CSS
     # minification. The callable should accept a single argument of
     # string which contains the content of original CSS, and return a
     # string of minified content. The result will be cached and
     # reused when possible.
-    'CSS_MIN_FUNC': 'csscompressor.compress',
+    'CSS_MIN_FUNC': 'rcssmin.cssmin',
+
+    # Extra keyword arguments which are sent to the callable for CSS
+    # minification. They are sent after the argument of a string of the
+    # content of original CSS. If no keyword arguments are sent, set it
+    # to an empty dict ({}) or None.
+    'CSS_MIN_FUNC_KWARGS': {
+        'keep_bang_comments': True,
+    },
 
     # A regular expression (case-sensitive by default) which is used to
     # search against assets (in relative URL without STATIC_URL prefix). The
@@ -69,8 +84,8 @@ settings_defaults = {
     # replaced URL in JavaScript. This is effective only if "JS_MIN_ENABLED"
     # is set to True. This fixes the problems and annoyances caused by a
     # deliberately added newline at the end of each loud comment by certain
-    # minification libraries (such as jsmin).
-    'JS_ASSETS_REPL_TRAILING_FIX': True,
+    # minification libraries (e.g. jsmin).
+    'JS_ASSETS_REPL_TRAILING_FIX': False,
 }
 
 settings_cache = None

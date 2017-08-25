@@ -29,7 +29,7 @@ Quick Start
        pip install django-smartstaticfiles
 
    Or install the stable version with extras for JavaScript and CSS minification
-   (will also install |jsmin|_ and |csscompressor|_):
+   (will also install |rjsmin|_ and |rcssmin|_):
 
    .. code:: bash
 
@@ -224,7 +224,7 @@ that loud comments (``/*! ... */``) are preserved after processing.
 Otherwise, JavaScript asset URLs replacement won't work. The default ``jsmin``
 library takes care of that.
 
-Some JavaScript minification libraries (including ``jsmin``) will deliberately
+Some JavaScript minification libraries (e.g. ``jsmin``) will deliberately
 insert a newline at the end of each loud comment after minification. For
 example, supposed that there is following code:
 
@@ -243,27 +243,19 @@ It would be minified as:
 
 This is totally acceptable in most cases. However, it is still possible that
 it causes unexpected results in `some edge cases`_ or drives perfectionists
-nuts. Therefore **django-smartstaticfiles** by default will remove one trailing
-newline (if presents) from each replaced URL in JavaScript if ``"JS_MIN_ENABLED"`` is set to ``True``. The final result after URLs replacement would be:
+nuts. You can tell **django-smartstaticfiles** to remove one trailing newline
+(if presents) from each replaced URL in JavaScript by setting
+``"JS_ASSETS_REPL_TRAILING_FIX"`` to ``True``. The final result after URLs
+replacement would be:
 
 .. code:: javascript
 
     var imageURL='../img/welcome.ac99c750806a.jpg';var mehFace='mehFace';
 
-That's much nicer. If you don't want this behavior, add the following setting
-to Django settings module:
+*(New in v0.3.0: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting was added and defaults to* ``True``*.)*
 
-.. code:: python
-
-    SMARTSTATICFILES_CONFIG = {
-        # ...
-        # Disable removal of a trailing newline at the end of loud comments when replacing asset URLs
-        # in JavaScript (restoring the old behavior in v0.2.0)
-        'JS_ASSETS_REPL_TRAILING_FIX': False,
-    }
-
-*(New in v0.3.0: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting and new behavior
-is added.)*
+*(New in v0.3.1: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting was set to*
+``False`` *by default.)*
 
 Configurations
 --------------
@@ -292,20 +284,35 @@ Possible keys and default values are listed below:
         'CSS_FILE_PATTERNS': ['*.css'],
 
         # Dotted string of the module path and the callable for JavaScript
-        # minification. The callable should accept a single argument of unicode
-        # string which contains the content of original JavaScript, and return
-        # a unicode string of minified content. (Notice that loud comments
-        # such as /*! ... */ must be preserved in the result so as to make
-        # JavaScript asset URLs replacement work.) The result will be cached and
-        # reused when possible.
-        'JS_MIN_FUNC': 'jsmin.jsmin',
+        # minification. The callable should accept a single argument of a string
+        # of the content of original JavaScript, and return a string of minified
+        # content. (Notice that loud comments such as /*! ... */ must be preserved
+        # in the result so as to make JavaScript asset URLs replacement work.)
+        # The result will be cached and reused when possible.
+        'JS_MIN_FUNC': 'rjsmin.jsmin',
+
+        # Extra keyword arguments which are sent to the callable for JavaScript
+        # minification. They are sent after the argument of a string of the
+        # content of original JavaScript. If no keyword arguments are sent, set it
+        # to an empty dict ({}) or None.
+        'JS_MIN_FUNC_KWARGS': {
+            'keep_bang_comments': True,
+        },
 
         # Dotted string of the module path and the callable for CSS
-        # minification. The callable should accept a single argument of unicode
+        # minification. The callable should accept a single argument of
         # string which contains the content of original CSS, and return a
-        # unicode string of minified content. The result will be cached and
+        # string of minified content. The result will be cached and
         # reused when possible.
-        'CSS_MIN_FUNC': 'csscompressor.compress',
+        'CSS_MIN_FUNC': 'rcssmin.cssmin',
+
+        # Extra keyword arguments which are sent to the callable for CSS
+        # minification. They are sent after the argument of a string of the
+        # content of original CSS. If no keyword arguments are sent, set it
+        # to an empty dict ({}) or None.
+        'CSS_MIN_FUNC_KWARGS': {
+            'keep_bang_comments': True,
+        },
 
         # A regular expression (case-sensitive by default) which is used to
         # search against assets (in relative URL without STATIC_URL prefix). The
@@ -334,8 +341,8 @@ Possible keys and default values are listed below:
         # replaced URL in JavaScript. This is effective only if "JS_MIN_ENABLED"
         # is set to True. This fixes the problems and annoyances caused by a
         # deliberately added newline at the end of each loud comment by certain
-        # minification libraries (such as jsmin).
-        'JS_ASSETS_REPL_TRAILING_FIX': True,
+        # minification libraries (e.g. jsmin).
+        'JS_ASSETS_REPL_TRAILING_FIX': False,
     }
 
 
@@ -414,11 +421,11 @@ the time of writing).
 .. |ManifestStaticFilesStorage| replace:: ``ManifestStaticFilesStorage``
 .. _ManifestStaticFilesStorage: https://docs.djangoproject.com/en/1.11/ref/contrib/staticfiles/#manifeststaticfilesstorage
 
-.. |jsmin| replace:: ``jsmin``
-.. _jsmin: https://github.com/tikitu/jsmin/
+.. |rjsmin| replace:: ``rjsmin``
+.. _rjsmin: https://github.com/ndparker/rjsmin
 
-.. |csscompressor| replace:: ``csscompressor``
-.. _csscompressor: https://github.com/sprymix/csscompressor
+.. |rcssmin| replace:: ``rcssmin``
+.. _rcssmin: https://github.com/ndparker/rcssmin
 
 .. _`some edge cases`: http://stackoverflow.com/questions/2846283/what-are-the-rules-for-javascripts-automatic-semicolon-insertion-asi
 

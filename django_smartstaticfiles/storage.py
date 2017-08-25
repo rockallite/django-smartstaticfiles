@@ -131,6 +131,7 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
                 return
 
             min_func = None
+            min_func_kwargs = None
             if (self.css_min_enabled or self.js_min_enabled) and \
                     not (self.re_ignore_min and
                          self.re_ignore_min.search(cleaned_name)):
@@ -139,10 +140,12 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
                         matches_patterns(cleaned_name, self.css_file_patterns):
                     # Minify CSS
                     min_func = self.css_min_func
+                    min_func_kwargs = self.css_min_func_kwargs
                 elif self.js_min_enabled and \
                         matches_patterns(cleaned_name, self.js_file_patterns):
                     # Minify JavaScript
                     min_func = self.js_min_func
+                    min_func_kwargs = self.js_min_func_kwargs
 
             if min_func:
                 # File content needs to be minified
@@ -160,7 +163,9 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
                     if opened:
                         content.close()
                 # Minify the content
-                content_text = min_func(content_text)
+                if min_func_kwargs is None:
+                    min_func_kwargs = {}
+                content_text = min_func(content_text, **min_func_kwargs)
                 # Convert to bytes and save it to a temporary file
                 with NamedTemporaryFile(delete=False) as temp_file:
                     temp_file.write(force_bytes(content_text))
