@@ -10,3 +10,6 @@ assert DJANGO_VERSION[0] == PROPER_DJANGO_VERSION[0] and \
     '%s is only compatible with Django %s.%s' % (
         (__name__,) + PROPER_DJANGO_VERSION
     )
+
+VERSION = (0, 3, 1)
+__version__ = '.'.join(VERSION)

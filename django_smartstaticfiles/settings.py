@@ -84,8 +84,8 @@ settings_defaults = {
     # replaced URL in JavaScript. This is effective only if "JS_MIN_ENABLED"
     # is set to True. This fixes the problems and annoyances caused by a
     # deliberately added newline at the end of each loud comment by certain
-    # minification libraries (such as jsmin).
-    'JS_ASSETS_REPL_TRAILING_FIX': True,
+    # minification libraries (e.g. jsmin).
+    'JS_ASSETS_REPL_TRAILING_FIX': False,
 }
 
 settings_cache = None
