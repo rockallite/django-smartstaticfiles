@@ -12,4 +12,4 @@ assert DJANGO_VERSION[0] == PROPER_DJANGO_VERSION[0] and \
     )
 
 VERSION = (0, 3, 1)
-__version__ = '.'.join(VERSION)
+__version__ = '.'.join(map(str, VERSION))
