@@ -1,6 +1,15 @@
 Changelog
 =========
 
+v0.3.1 (2017-08-25) Rockallite Wulf
+-----------------------------------
+
+- Change default CSS and JavaScript minifiers back to ``"rcssmin.cssmin"`` and
+  ``"rjsmin.jsmin"``, and add new settings attribute "JS_MIN_FUNC_KWARGS" and
+  "CSS_MIN_FUNC_KWARGS" to make them keep loud comments (``/*! ... */``),
+  because there is a bug in ``"jsmin"`` libarary
+  (https://github.com/tikitu/jsmin/issues/23)
+
 v0.3.0 (2017-05-12) Rockallite Wulf
 -----------------------------------
 
