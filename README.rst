@@ -252,7 +252,7 @@ replacement would be:
 
     var imageURL='../img/welcome.ac99c750806a.jpg';var mehFace='mehFace';
 
-*(New in v0.3.0: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting was added and defaults to* ``True``*.)*
+*(New in v0.3.0: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting was added and defaults to* ``True`` *.)*
 
 *(New in v0.3.1: the* ``JS_ASSETS_REPL_TRAILING_FIX`` *setting was set to*
 ``False`` *by default.)*
