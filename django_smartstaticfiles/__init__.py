@@ -11,4 +11,4 @@ assert DJANGO_VERSION[0] == PROPER_DJANGO_VERSION[0] and \
         (__name__,) + PROPER_DJANGO_VERSION
     )
 
-__version__ = '0.3.1-1'
+__version__ = '0.3.2'

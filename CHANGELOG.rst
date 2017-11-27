@@ -1,6 +1,11 @@
 Changelog
 =========
 
+v0.3.2 (2017-11-28) Rockallite Wulf
+-----------------------------------
+
+- Fixed a bug that causes ignored hashing files be hashed again later.
+
 v0.3.1 (2017-08-25) Rockallite Wulf
 -----------------------------------
 
