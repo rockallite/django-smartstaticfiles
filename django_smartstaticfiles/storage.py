@@ -198,11 +198,12 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
         for name in sorted(paths.keys(), key=path_level, reverse=True):
             # Added by Rockallite: check whether hashing should be ignored
             cleaned_name = self.clean_name(name)
-            hash_key = self.hash_key(cleaned_name)
-            if (self.re_ignore_hashing is not None
-                    and cleaned_name not in self.hashing_ignored_files
-                    and self.re_ignore_hashing.search(cleaned_name)):
-                # Ignore hashing by short-circuited the logic
+            # Ignore hashing by short-circuited the logic
+            if cleaned_name in self.hashing_ignored_files:
+                yield name, cleaned_name, False, False
+                continue
+            hash_key = self.hash_key(cleaned_name)            
+            if self.re_ignore_hashing is not None and self.re_ignore_hashing.search(cleaned_name):
                 hashed_files[hash_key] = cleaned_name
                 self.hashing_ignored_files.add(cleaned_name)
                 yield name, cleaned_name, False, False
