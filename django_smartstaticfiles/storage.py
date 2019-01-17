@@ -7,6 +7,8 @@ import posixpath
 import re
 from tempfile import NamedTemporaryFile
 
+import six
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files import File
@@ -157,8 +159,9 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
                     content = storage.open(path)
                     opened = True
                 try:
-                    # content_text = content.read().decode(settings.FILE_CHARSET)
                     content_text = content.read()
+                    if not isinstance(content_text, six.string_types):
+                        content_text.decode(settings.FILE_CHARSET)
                 finally:
                     if opened:
                         content.close()
