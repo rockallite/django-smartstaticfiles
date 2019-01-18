@@ -21,7 +21,7 @@ setup(
     author_email='rockallite.wulf@gmail.com',
     install_requires=[
         'Django>=1.11,<1.12',
-        'six==1.12.0'
+        'six==1.11.0'
     ],
     extras_require={
         'jsmin': ['rjsmin'],
