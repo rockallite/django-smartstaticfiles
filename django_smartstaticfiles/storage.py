@@ -161,7 +161,9 @@ class SmartManifestFilesMixin(CachedSettingsMixin, ManifestFilesMixin):
                 try:
                     content_text = content.read()
                     if not isinstance(content_text, six.string_types):
-                        content_text.decode(settings.FILE_CHARSET)
+                        content_text = content_text.decode(
+                            settings.FILE_CHARSET
+                        )
                 finally:
                     if opened:
                         content.close()
